@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>10k Records Virtual Table (Optimized)</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%232196f3'/><text x='16' y='22' font-size='16' text-anchor='middle' fill='white' font-family='Arial'>10k</text></svg>">
+  <style>
+    body { font-family: 'Segoe UI', Arial, sans-serif; margin: 0; padding: 0; background: #f4f7fb; }
+    .container { max-width: 1100px; margin: 32px auto; background: #fff; box-shadow: 0 4px 24px #0002; border-radius: 14px; padding: 32px 28px; }
+    h2 { margin-top: 0; }
+    .toolbar {
+      display: flex;
+      align-items: center;
+      gap: 18px;
+      margin-bottom: 22px;
+      flex-wrap: wrap;
+    }
+    .toolbar .metrics {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+    .badge {
+      display: inline-block;
+      background: #e3f2fd;
+      color: #1769aa;
+      font-size: 0.97em;
+      border-radius: 12px;
+      padding: 2px 12px;
+      font-family: monospace;
+      margin-right: 2px;
+      box-shadow: 0 1px 2px #0001;
+    }
+    .icon-btn {
+      background: #2196f3;
+      border: none;
+      border-radius: 6px;
+      color: #fff;
+      padding: 7px 18px 7px 14px;
+      font-size: 1rem;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      transition: background 0.18s, box-shadow 0.18s;
+      box-shadow: 0 2px 8px #2196f322;
+    }
+    .icon-btn:hover { background: #1769aa; }
+    .icon-btn svg { width: 18px; height: 18px; fill: #fff; }
+    #progress-bar {
+      width: 220px;
+      height: 14px;
+      background: #e3eaf3;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid #b6c6d6;
+      margin-right: 8px;
+      box-shadow: 0 1px 4px #2196f311;
+      position: relative;
+    }
+    #progress-fill {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, #2196f3 60%, #64b5f6 100%);
+      transition: width 0.2s;
+    }
+    #progress-text {
+      font-family: monospace;
+      color: #1769aa;
+      font-size: 1em;
+      margin-right: 8px;
+    }
+    .table-container {
+      height: 600px;
+      overflow-y: auto;
+      border: 1.5px solid #c7d6e6;
+      border-radius: 10px;
+      background: #fafdff;
+      box-shadow: 0 2px 12px #2196f308;
+    }
+    table {
+      border-collapse: separate;
+      border-spacing: 0;
+      width: 100%;
+      background: #fff;
+    }
+    th, td {
+      border: 1px solid #e0e7ef;
+      padding: 7px 12px;
+      text-align: left;
+      font-size: 15px;
+      background: none;
+    }
+    thead {
+      background: #f2f6fa;
+      position: sticky;
+      top: 0;
+      z-index: 2;
+      box-shadow: 0 2px 8px #2196f311;
+    }
+    th {
+      font-weight: 600;
+      color: #1769aa;
+      background: #f2f6fa;
+    }
+    tr {
+      height: 32px;
+      transition: background 0.13s;
+    }
+    tbody tr:not(:first-child):not(:last-child):hover td {
+      background: #e3f2fd;
+    }
+    tbody tr:nth-child(even) td {
+      background: #f7fbff;
+    }
+    @media (max-width: 700px) {
+      .container { padding: 8px; }
+      table, th, td { font-size: 13px; }
+      #progress-bar { width: 100px; }
+      .toolbar { flex-direction: column; align-items: flex-start; gap: 8px; }
+      .table-container { height: 350px; }
+    }
+    .toolbar-actions {
+      margin: 0 0 18px 0;
+      display: flex;
+      width: 100%;
+    }
+    .icon-btn.danger {
+      background: #e53935;
+      color: #fff;
+      box-shadow: 0 2px 8px #e5393522;
+    }
+    .icon-btn.danger:hover {
+      background: #b71c1c;
+    }
+  </style>
+</head>
+<body>
+<div class="container">
+  <h2>10,000 Records Table (Virtual Scroll + Caching)</h2>
+  <div class="toolbar">
+    <div id="progress-bar"><div id="progress-fill"></div></div>
+    <span id="progress-text">Loading...</span>
+    <div class="metrics">
+      <span id="memory-usage" class="badge">Memory: checking...</span>
+      <span id="render-time" class="badge">Render: -- ms</span>
+    </div>
+  </div>
+  <div class="toolbar-actions">
+    <button id="clear-cache" class="icon-btn danger" title="Clear cache">
+      <svg viewBox="0 0 20 20"><path d="M6.5 2a1 1 0 0 0-1 1V4H3a1 1 0 1 0 0 2h14a1 1 0 1 0 0-2h-2.5V3a1 1 0 0 0-1-1h-7zm0 2h7V3h-7v1zM5 7v8a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2V7H5zm2 2a1 1 0 1 1 2 0v5a1 1 0 1 1-2 0V9zm4 0a1 1 0 1 1 2 0v5a1 1 0 1 1-2 0V9z"/></svg>
+      Clear Cache
+    </button>
+  </div>
+  <div class="table-container" id="table-container">
+    <table>
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>ID</th>
+          <th>First Name</th>
+          <th>Last Name</th>
+          <th>Email</th>
+        </tr>
+      </thead>
+      <tbody id="data-body">
+        <!-- Spacer row (top) -->
+        <!-- Visible rows -->
+        <!-- Spacer row (bottom) -->
+      </tbody>
+    </table>
+  </div>
+</div>
+<script>
+const DATA_URL = 'https://gist.githubusercontent.com/diondree/92e4518ca7529e1f4d1300993e5cc287/raw/5e689bb33a11a2e55cb11e6f413ddea14c4be804/mock-data-10000.json';
+const CACHE_KEY = 'mockData10k';
+const CACHE_TIME_KEY = 'mockData10k_time';
+const CACHE_DURATION = 1000 * 60 * 10; // 10 minutes
+const MAX_ROWS = 10000;
+const ROW_HEIGHT = 32; // px
+const VISIBLE_ROWS = 24; // Number of rows to render at once
+
+const tbody = document.getElementById('data-body');
+const container = document.getElementById('table-container');
+const progressFill = document.getElementById('progress-fill');
+const progressText = document.getElementById('progress-text');
+const memoryText = document.getElementById('memory-usage');
+const clearCacheBtn = document.getElementById('clear-cache');
+const renderTimeText = document.getElementById('render-time');
+
+let data = [];
+let rowCache = {};
+let total = 0;
+let isLoading = true;
+
+function formatBytes(bytes) {
+  return (bytes / 1024 / 1024).toFixed(2) + ' MB';
+}
+
+function updateMemoryUsage() {
+  if (performance.memory) {
+    const used = performance.memory.usedJSHeapSize;
+    const total = performance.memory.totalJSHeapSize;
+    const limit = performance.memory.jsHeapSizeLimit;
+    memoryText.textContent = `Memory: ${formatBytes(used)} used / ${formatBytes(total)} total (limit: ${formatBytes(limit)})`;
+  } else {
+    memoryText.textContent = 'Memory usage not supported in this browser.';
+  }
+}
+setInterval(updateMemoryUsage, 2000);
+
+function getRowHTML(i) {
+  if (rowCache[i]) return rowCache[i];
+  const item = data[i];
+  if (!item) return '';
+  const html = `<tr style="height:${ROW_HEIGHT}px">
+    <td>${i + 1}</td>
+    <td>${item._id}</td>
+    <td>${item.first_name}</td>
+    <td>${item.last_name}</td>
+    <td>${item.email}</td>
+  </tr>`;
+  rowCache[i] = html;
+  return html;
+}
+
+function renderRows(start) {
+  const end = Math.min(start + VISIBLE_ROWS, total);
+  const topSpacerHeight = start * ROW_HEIGHT;
+  const bottomSpacerHeight = (total - end) * ROW_HEIGHT;
+  let rows = '';
+  // Top spacer
+  if (topSpacerHeight > 0) {
+    rows += `<tr style="height:${topSpacerHeight}px"><td colspan="5" style="padding:0;border:none;background:transparent"></td></tr>`;
+  }
+  // Visible rows
+  for (let i = start; i < end; i++) {
+    rows += getRowHTML(i);
+  }
+  // Bottom spacer
+  if (bottomSpacerHeight > 0) {
+    rows += `<tr style="height:${bottomSpacerHeight}px"><td colspan="5" style="padding:0;border:none;background:transparent"></td></tr>`;
+  }
+  tbody.innerHTML = rows;
+}
+
+function onScroll() {
+  const scrollTop = container.scrollTop;
+  const startRow = Math.floor(scrollTop / ROW_HEIGHT);
+  renderRows(startRow);
+}
+
+function setProgress(percent, text) {
+  progressFill.style.width = percent + '%';
+  progressText.textContent = text;
+}
+
+async function getDataWithCache() {
+  const now = Date.now();
+  const cached = localStorage.getItem(CACHE_KEY);
+  const cachedTime = localStorage.getItem(CACHE_TIME_KEY);
+  if (cached && cachedTime && now - cachedTime < CACHE_DURATION) {
+    setProgress(100, 'Loaded from cache');
+    return JSON.parse(cached);
+  }
+  setProgress(0, 'Fetching data...');
+  const response = await fetch(DATA_URL);
+  let d = await response.json();
+  d = d.slice(0, MAX_ROWS);
+  localStorage.setItem(CACHE_KEY, JSON.stringify(d));
+  localStorage.setItem(CACHE_TIME_KEY, now);
+  setProgress(100, 'Loaded from network');
+  return d;
+}
+
+async function init() {
+  const renderStart = performance.now();
+  isLoading = true;
+  setProgress(0, 'Loading...');
+  data = await getDataWithCache();
+  total = data.length;
+  rowCache = {};
+  setProgress(100, `Ready (${total} records)`);
+  renderRows(0);
+  isLoading = false;
+  const renderEnd = performance.now();
+  renderTimeText.textContent = `Render: ${(renderEnd - renderStart).toFixed(1)} ms`;
+}
+
+container.addEventListener('scroll', () => {
+  if (!isLoading) onScroll();
+});
+
+clearCacheBtn.addEventListener('click', () => {
+  localStorage.removeItem(CACHE_KEY);
+  localStorage.removeItem(CACHE_TIME_KEY);
+  setProgress(0, 'Cache cleared. Reloading...');
+  setTimeout(() => {
+    window.location.reload();
+  }, 500);
+});
+
+// Ensure correct table height for scrollbar
+container.querySelector('table').style.position = 'relative';
+
+init();
+</script>
+</body>
+</html>
